@@ -38,9 +38,20 @@ for (const file of files) if (!exists(file)) fail(`missing deployment file: ${fi
 const shellPaths = [...worker.matchAll(/'\.\/([^']+)'/g)]
   .map(match => match[1])
   .filter(file => file && file !== '.');
+const shellSet = new Set(shellPaths);
 for (const file of shellPaths) {
   if (!exists(file)) fail(`service worker references missing file: ${file}`);
   if (!files.includes(file)) fail(`service worker asset is absent from deployment-files.json: ${file}`);
+}
+
+const offlineRuntime = files.filter(file => /^klas-.*\.(?:js|mjs)$/.test(file));
+for (const file of offlineRuntime) {
+  if (!shellSet.has(file)) fail(`deployed runtime is absent from offline app shell: ${file}`);
+}
+
+const testScript = String(pkg.scripts?.test || '');
+if (!testScript.includes('*.test.js') || !testScript.includes('*.test.mjs')) {
+  fail('npm test must discover both .js and .mjs test suites');
 }
 
 if (process.exitCode) process.exit(process.exitCode);
