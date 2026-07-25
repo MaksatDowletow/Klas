@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, setDoc, addDoc, updateDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { db, runtime, bridge, toast, handleError, timeLabel, config } from './klas-backend-core.js';
 
 const MAX_VIDEO_PARTICIPANTS = 6;
@@ -7,6 +7,7 @@ let participantStop = null;
 let signalStop = null;
 let localStream = null;
 const peers = new Map();
+const processedSignals = new Set();
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 async function requireGroup(groupId){
@@ -57,27 +58,32 @@ async function openChat(groupId){
 function rtcConfig(){return {iceServers:Array.isArray(config?.rtc?.iceServers)&&config.rtc.iceServers.length?config.rtc.iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}]};}
 function tile(uid,name,stream,muted=false){let node=document.getElementById(`groupVideo-${uid}`);if(!node){node=document.createElement('div');node.id=`groupVideo-${uid}`;node.className='group-video-tile';node.innerHTML=`<video autoplay playsinline ${muted?'muted':''}></video><span>${esc(name)}</span>`;document.getElementById('groupVideoGrid').appendChild(node)}node.querySelector('video').srcObject=stream;}
 function toggleTrack(kind){const track=(kind==='audio'?localStream?.getAudioTracks():localStream?.getVideoTracks())?.[0];if(track){track.enabled=!track.enabled;toast(track.enabled?`${kind==='audio'?'Mikrofon':'Kamera'} açyldy`:`${kind==='audio'?'Mikrofon':'Kamera'} ýapyldy`)}}
-async function signal(groupId,to,type,payload){await setDoc(doc(db,'groupCalls',groupId,'signals',`${runtime.user.uid}_${to}`),{from:runtime.user.uid,to,type,payload,updatedAt:serverTimestamp()});}
+async function signal(groupId,to,type,payload){const value={from:runtime.user.uid,to,type,payload,updatedAt:serverTimestamp()};if(type==='candidate')await addDoc(collection(db,'groupCalls',groupId,'signals'),value);else await setDoc(doc(db,'groupCalls',groupId,'signals',`${type}_${runtime.user.uid}_${to}`),value);}
 async function peer(groupId,remoteUid,initiator){
   if(peers.has(remoteUid))return peers.get(remoteUid); const pc=new RTCPeerConnection(rtcConfig()); peers.set(remoteUid,pc); localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
   pc.ontrack=e=>tile(remoteUid,runtime.profiles.get(remoteUid)?.fullName||'Topar agzasy',e.streams[0]); pc.onicecandidate=e=>{if(e.candidate)signal(groupId,remoteUid,'candidate',e.candidate.toJSON()).catch(()=>{})};
   if(initiator){const offer=await pc.createOffer();await pc.setLocalDescription(offer);await signal(groupId,remoteUid,'offer',{type:offer.type,sdp:offer.sdp})} return pc;
 }
-async function receiveSignal(groupId,data){if(data.to!==runtime.user.uid||data.from===runtime.user.uid)return;const pc=await peer(groupId,data.from,false);if(data.type==='offer'){await pc.setRemoteDescription(data.payload);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await signal(groupId,data.from,'answer',{type:answer.type,sdp:answer.sdp})}else if(data.type==='answer'&&!pc.currentRemoteDescription)await pc.setRemoteDescription(data.payload);else if(data.type==='candidate')await pc.addIceCandidate(data.payload).catch(()=>{})}
+async function receiveSignal(groupId,id,data){
+  if(data.to!==runtime.user.uid||data.from===runtime.user.uid)return; const token=`${id}:${data.type}:${data.payload?.sdp||data.payload?.candidate||''}`; if(processedSignals.has(token))return; processedSignals.add(token);
+  const pc=await peer(groupId,data.from,false); if(data.type==='offer'){if(!pc.currentRemoteDescription){await pc.setRemoteDescription(data.payload);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await signal(groupId,data.from,'answer',{type:answer.type,sdp:answer.sdp})}}else if(data.type==='answer'&&!pc.currentRemoteDescription)await pc.setRemoteDescription(data.payload);else if(data.type==='candidate')await pc.addIceCandidate(data.payload).catch(()=>{});
+}
 
 async function joinVideo(groupId){
-  const group=await requireGroup(groupId); installUi(); if((group.memberIds||[]).length>MAX_VIDEO_PARTICIPANTS)throw new Error(`Topar wideoçaty iň köp ${MAX_VIDEO_PARTICIPANTS} agzany goldaýar.`);
+  const group=await requireGroup(groupId); installUi();
+  const activeSnapshot=await getDocs(query(collection(db,'groupCalls',groupId,'participants'),where('active','==',true),limit(MAX_VIDEO_PARTICIPANTS+1)));
+  if(activeSnapshot.size>=MAX_VIDEO_PARTICIPANTS)throw new Error(`Wideo otagy doly. Iň köp ${MAX_VIDEO_PARTICIPANTS} gatnaşyjy.`);
   localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}});
   const layer=document.getElementById('groupVideoLayer');layer.dataset.groupId=groupId;layer.classList.remove('hidden');layer.setAttribute('aria-hidden','false');document.getElementById('groupVideoTitle').textContent=`${group.name||'Topar'} · Wideoçat`;tile(runtime.user.uid,'Siz',localStream,true);
   await setDoc(doc(db,'groupCalls',groupId),{groupId,groupName:group.name||'Topar',memberIds:group.memberIds||[],active:true,updatedAt:serverTimestamp()},{merge:true});
-  await setDoc(doc(db,'groupCalls',groupId,'participants',runtime.user.uid),{uid:runtime.user.uid,name:runtime.profile?.shortName||runtime.user.displayName||'Agza',joinedAt:serverTimestamp(),active:true});
+  await setDoc(doc(db,'groupCalls',groupId,'participants',runtime.user.uid),{uid:runtime.user.uid,name:runtime.profile?.shortName||runtime.user.displayName||'Agza',joinedAt:serverTimestamp(),updatedAt:serverTimestamp(),active:true});
   participantStop=onSnapshot(collection(db,'groupCalls',groupId,'participants'),snapshot=>{const others=snapshot.docs.map(d=>d.data()).filter(p=>p.uid!==runtime.user.uid&&p.active);document.getElementById('groupVideoStatus').textContent=`${others.length+1} gatnaşyjy`;others.forEach(p=>peer(groupId,p.uid,runtime.user.uid.localeCompare(p.uid)<0).catch(error=>handleError(error,'Topar peer döredilmedi')))});
-  signalStop=onSnapshot(collection(db,'groupCalls',groupId,'signals'),snapshot=>snapshot.docChanges().forEach(c=>receiveSignal(groupId,c.doc.data()).catch(error=>handleError(error,'Wideo signal işlenmedi'))));
+  signalStop=onSnapshot(query(collection(db,'groupCalls',groupId,'signals'),where('to','==',runtime.user.uid)),snapshot=>snapshot.docChanges().forEach(c=>receiveSignal(groupId,c.doc.id,c.doc.data()).catch(error=>handleError(error,'Wideo signal işlenmedi'))));
 }
 
 async function leaveVideo(){
-  const layer=document.getElementById('groupVideoLayer');const groupId=layer?.dataset.groupId;if(groupId&&runtime.user)await updateDoc(doc(db,'groupCalls',groupId,'participants',runtime.user.uid),{active:false,leftAt:serverTimestamp()}).catch(()=>{});
-  participantStop?.();signalStop?.();participantStop=signalStop=null;peers.forEach(pc=>pc.close());peers.clear();localStream?.getTracks().forEach(t=>t.stop());localStream=null;document.getElementById('groupVideoGrid')?.replaceChildren();if(layer){layer.classList.add('hidden');layer.setAttribute('aria-hidden','true');delete layer.dataset.groupId;}
+  const layer=document.getElementById('groupVideoLayer');const groupId=layer?.dataset.groupId;if(groupId&&runtime.user)await updateDoc(doc(db,'groupCalls',groupId,'participants',runtime.user.uid),{active:false,leftAt:serverTimestamp(),updatedAt:serverTimestamp()}).catch(()=>{});
+  participantStop?.();signalStop?.();participantStop=signalStop=null;peers.forEach(pc=>pc.close());peers.clear();processedSignals.clear();localStream?.getTracks().forEach(t=>t.stop());localStream=null;document.getElementById('groupVideoGrid')?.replaceChildren();if(layer){layer.classList.add('hidden');layer.setAttribute('aria-hidden','true');delete layer.dataset.groupId;}
 }
 
 document.addEventListener('click',event=>{const chat=event.target.closest('[data-group-chat]');if(chat){openChat(chat.dataset.groupChat).catch(e=>toast(e.message));return}const video=event.target.closest('[data-group-video]');if(video)joinVideo(video.dataset.groupVideo).catch(e=>toast(e.message));});
