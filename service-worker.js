@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VERSION = 'klas-shell-v6.4.3';
+const CACHE_VERSION = 'klas-shell-v6.5.0';
 const APP_BASE = new URL('./', self.registration.scope);
 const appUrl = path => new URL(path, APP_BASE).href;
 const APP_SHELL = [
@@ -10,7 +10,7 @@ const APP_SHELL = [
   './klas-v4-1.js','./klas-v4-2.js','./klas-v4-3.js','./klas-v4-4.js','./klas-bridge.js','./klas-pwa.js',
   './klas-backend-bootstrap.js','./klas-backend-core.js','./klas-backend-ui.js','./klas-backend-chat.js','./klas-backend-community.js',
   './klas-backend-notifications.js','./klas-backend-video.js','./klas-backend-realtime.js','./klas-backend-school-relations.js',
-  './klas-school-groups-policy.mjs','./klas-registration-groups-policy.mjs','./klas-registration-groups.js',
+  './klas-school-groups-policy.mjs','./klas-registration-groups-policy.mjs','./klas-registration-groups.js','./klas-group-communication.js',
   './assets/icons/klas-icon.svg','./assets/icons/klas-maskable.svg','./assets/icons/klas-180.png','./assets/icons/klas-192.png','./assets/icons/klas-512.png','./assets/icons/klas-maskable-192.png','./assets/icons/klas-maskable-512.png'
 ].map(appUrl);
 
@@ -35,38 +35,18 @@ self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data?.type === 'GET_VERSION') event.source?.postMessage({ type: 'VERSION', version: CACHE_VERSION });
 });
-
 async function networkFirst(request, fallbackUrl){
   const cache = await caches.open(CACHE_VERSION);
-  try {
-    const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok && response.type === 'basic') await cache.put(request, response.clone());
-    return response;
-  } catch {
-    return (await cache.match(request, { ignoreSearch: true })) || (fallbackUrl ? await cache.match(fallbackUrl) : null) || Response.error();
-  }
+  try { const response = await fetch(request, { cache: 'no-store' }); if (response.ok && response.type === 'basic') await cache.put(request, response.clone()); return response; }
+  catch { return (await cache.match(request, { ignoreSearch: true })) || (fallbackUrl ? await cache.match(fallbackUrl) : null) || Response.error(); }
 }
-
 async function cacheFirst(request){
-  const cache = await caches.open(CACHE_VERSION);
-  const cached = await cache.match(request, { ignoreSearch: true });
-  if (cached) return cached;
-  try {
-    const response = await fetch(request);
-    if (response.ok && response.type === 'basic') await cache.put(request, response.clone());
-    return response;
-  } catch { return Response.error(); }
+  const cache = await caches.open(CACHE_VERSION); const cached = await cache.match(request, { ignoreSearch: true }); if (cached) return cached;
+  try { const response = await fetch(request); if (response.ok && response.type === 'basic') await cache.put(request, response.clone()); return response; } catch { return Response.error(); }
 }
-
 self.addEventListener('fetch', event => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
-  const url = new URL(request.url);
+  const { request } = event; if (request.method !== 'GET') return; const url = new URL(request.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith(APP_BASE.pathname)) return;
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, appUrl('./offline.html')));
-    return;
-  }
-  const isCriticalAsset = /\.(?:js|mjs|css|json|webmanifest)$/i.test(url.pathname);
-  event.respondWith(isCriticalAsset ? networkFirst(request) : cacheFirst(request));
+  if (request.mode === 'navigate') { event.respondWith(networkFirst(request, appUrl('./offline.html'))); return; }
+  event.respondWith(/\.(?:js|mjs|css|json|webmanifest)$/i.test(url.pathname) ? networkFirst(request) : cacheFirst(request));
 });
