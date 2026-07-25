@@ -1,5 +1,5 @@
 const statusNode = document.getElementById('backendStatus');
-const release = '20260724-registration-groups1';
+const release = '20260725-deterministic-groups1';
 const styleHref = `./klas-livechat.css?v=${release}`;
 
 if (![...document.styleSheets].some(sheet => sheet.href?.includes('klas-livechat.css'))) {
