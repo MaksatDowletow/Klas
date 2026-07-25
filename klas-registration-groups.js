@@ -19,6 +19,7 @@ let opening = false;
 let synchronizing = null;
 
 async function automaticMembershipGroups(uid){
+  if (!uid) return [];
   const snapshot = await getDocs(query(
     collection(db, 'groups'),
     where('memberIds', 'array-contains', uid),
@@ -64,7 +65,9 @@ export async function assignRegistrationGroups(input){
         }
 
         const group = snapshot.data();
-        const members = [...new Set([...(group.memberIds || []), user.uid])];
+        const existingMembers = group.memberIds || [];
+        if (existingMembers.includes(user.uid)) continue;
+        const members = [...new Set([...existingMembers, user.uid])];
         transaction.update(reference, {
           memberIds: members,
           membersCount: members.length,
@@ -76,7 +79,9 @@ export async function assignRegistrationGroups(input){
         if (desiredKeys.has(group.id)) continue;
         const snapshot = snapshots.get(group.id);
         if (!snapshot?.exists()) continue;
-        const members = (snapshot.data().memberIds || []).filter(uid => uid !== user.uid);
+        const previous = snapshot.data().memberIds || [];
+        if (!previous.includes(user.uid)) continue;
+        const members = previous.filter(uid => uid !== user.uid);
         transaction.update(group.ref, {
           memberIds: members,
           membersCount: members.length,
@@ -107,6 +112,7 @@ async function openAssignmentDialog(forceEdit = false){
     const serverData = registrationDataFromGroups(existing);
     if (serverData && !forceEdit) {
       await assignRegistrationGroups(serverData);
+      opening = false;
       return;
     }
 
