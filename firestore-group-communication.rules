@@ -1,0 +1,77 @@
+    match /groupConversations/{groupId} {
+      allow read: if isActiveMember()
+        && exists(/databases/$(database)/documents/groups/$(groupId))
+        && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+      allow create, update: if isActiveMember()
+        && exists(/databases/$(database)/documents/groups/$(groupId))
+        && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+        && request.resource.data.groupId == groupId
+        && request.resource.data.memberIds == get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+        && validText(request.resource.data.get('groupName', ''), 80, true)
+        && validText(request.resource.data.get('lastMessage', ''), 4000, false);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        allow create: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && request.resource.data.senderId == request.auth.uid
+          && validText(request.resource.data.text, 4000, true)
+          && validText(request.resource.data.get('senderName', ''), 100, true)
+          && request.resource.data.seenBy == [request.auth.uid]
+          && request.resource.data.createdAt == request.time;
+        allow update: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy'])
+          && request.resource.data.seenBy.toSet().hasAll(resource.data.seenBy.toSet())
+          && request.resource.data.seenBy.toSet().difference(resource.data.seenBy.toSet()).hasOnly([request.auth.uid]);
+        allow delete: if isActiveMember() && resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    match /groupCalls/{groupId} {
+      allow read: if isActiveMember()
+        && exists(/databases/$(database)/documents/groups/$(groupId))
+        && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+      allow create, update: if isActiveMember()
+        && exists(/databases/$(database)/documents/groups/$(groupId))
+        && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+        && request.resource.data.groupId == groupId
+        && request.resource.data.memberIds == get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+        && request.resource.data.active is bool
+        && validText(request.resource.data.get('groupName', ''), 80, true);
+      allow delete: if false;
+
+      match /participants/{uid} {
+        allow read: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        allow create, update: if isActiveMember() && isSelf(uid)
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.active is bool
+          && validText(request.resource.data.get('name', ''), 100, true);
+        allow delete: if isActiveMember() && isSelf(uid);
+      }
+
+      match /signals/{signalId} {
+        allow read: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+        allow create, update: if isActiveMember()
+          && exists(/databases/$(database)/documents/groups/$(groupId))
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.to != request.auth.uid
+          && request.resource.data.to in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+          && request.resource.data.type in ['offer', 'answer', 'candidate'];
+        allow delete: if isActiveMember()
+          && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      }
+    }
