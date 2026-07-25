@@ -5,15 +5,18 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const basePath = path.join(root, 'firestore.rules');
-const fragmentPath = path.join(root, 'firestore-group-communication.rules');
+const fragmentPaths = [
+  path.join(root, 'firestore-group-communication.rules'),
+  path.join(root, 'firestore-user-media.rules')
+];
 const outputPath = path.join(root, 'firestore.generated.rules');
 const marker = '    match /{document=**} { allow read, write: if false; }';
 
 const base = fs.readFileSync(basePath, 'utf8');
-const fragment = fs.readFileSync(fragmentPath, 'utf8').trimEnd();
+const fragments = fragmentPaths.map(file => fs.readFileSync(file, 'utf8').trimEnd());
 if (!base.includes(marker)) throw new Error('Firestore catch-all marker tapylmady.');
-if (!fragment.includes('match /groupConversations/{groupId}')) throw new Error('Topar çat rules fragmenti nädogry.');
-if (!fragment.includes('match /groupCalls/{groupId}')) throw new Error('Topar wideoçat rules fragmenti nädogry.');
-const generated = base.replace(marker, `${fragment}\n\n${marker}`);
+if (!fragments[0].includes('match /groupConversations/{groupId}') || !fragments[0].includes('match /groupCalls/{groupId}')) throw new Error('Topar aragatnaşyk rules fragmenti nädogry.');
+if (!fragments[1].includes('match /media/{mediaId}') || !fragments[1].includes('match /mediaAlbums/{albumId}')) throw new Error('Ulanyjy media rules fragmenti nädogry.');
+const generated = base.replace(marker, `${fragments.join('\n\n')}\n\n${marker}`);
 fs.writeFileSync(outputPath, generated);
-console.log(`Firestore rules generated: ${path.basename(outputPath)}`);
+console.log(`Firestore rules generated: ${path.basename(outputPath)} (${fragments.length} fragments)`);
