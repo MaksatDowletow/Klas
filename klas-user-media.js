@@ -3,8 +3,6 @@ import {
   doc,
   addDoc,
   updateDoc,
-  deleteDoc,
-  getDocs,
   onSnapshot,
   query,
   where,
@@ -13,7 +11,7 @@ import {
   writeBatch,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
-import { db, runtime, bridge, toast, handleError, normalizeHttpUrl, timeLabel } from './klas-backend-core.js';
+import { db, runtime, bridge, toast, handleError, timeLabel, config } from './klas-backend-core.js';
 
 const state = { items: [], albums: [], selected: new Set(), stopMedia: null, stopAlbums: null };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -116,14 +114,38 @@ async function editItem(id){
   });
 }
 
+async function deleteMediaAsset(id){
+  const user = requireUser();
+  const endpoint = String(config?.cloudinary?.deleteEndpoint || '').trim();
+  if (!/^https:\/\//i.test(endpoint)) throw new Error('Media pozma hyzmaty sazlanmady.');
+  const token = await user.getIdToken();
+  const response = await fetch(endpoint, {
+    method:'POST',
+    headers:{ 'content-type':'application/json', authorization:`Bearer ${token}` },
+    body:JSON.stringify({ mediaId:id })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok !== true) throw new Error(result.error || `Media pozulmady (${response.status})`);
+  return result;
+}
+
 async function deleteItems(ids){
   const unique = [...new Set(ids)].filter(id => state.items.some(item => item.id === id));
-  if (!unique.length || !confirm(`${unique.length} media ýazgysyny pozmalymy?`)) return;
-  const batch = writeBatch(db);
-  unique.forEach(id => batch.delete(doc(db, 'media', id)));
-  await batch.commit();
-  unique.forEach(id => state.selected.delete(id));
-  toast(`${unique.length} media ýazgysy pozuldy`);
+  if (!unique.length || !confirm(`${unique.length} media faýlyny Cloudinary-den we saýtdan doly pozmalymy?`)) return;
+  const results = await Promise.allSettled(unique.map(deleteMediaAsset));
+  const deleted = [];
+  const failed = [];
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') deleted.push(unique[index]);
+    else failed.push({ id:unique[index], error:result.reason });
+  });
+  deleted.forEach(id => state.selected.delete(id));
+  if (failed.length) {
+    console.error('Media deletion failures', failed);
+    toast(`${deleted.length} faýl pozuldy, ${failed.length} faýl pozulmady`);
+    throw failed[0].error;
+  }
+  toast(`${deleted.length} media faýly Cloudinary-den hem doly pozuldy`);
 }
 
 async function moveSelected(){
