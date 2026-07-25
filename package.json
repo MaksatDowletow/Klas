@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "test": "node scripts/test-unit.js",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-klas-auth \"node --test tests/firestore-rules.test.mjs\"",
+    "build:rules": "node scripts/build-firestore-rules.js",
+    "test:rules": "npm run build:rules && firebase emulators:exec --only firestore --project demo-klas-auth \"node --test tests/firestore-rules.test.mjs\"",
+    "deploy:rules": "npm run build:rules && firebase deploy --only firestore:rules",
     "audit:release": "node scripts/build-pages.js",
     "build:pages": "node scripts/build-pages.js"
   },
