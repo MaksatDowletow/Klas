@@ -1,0 +1,63 @@
+    match /media/{mediaId} {
+      allow read: if isActiveMember()
+        && (resource.data.get('visibility', 'public') == 'public'
+          || resource.data.ownerId == request.auth.uid);
+      allow create: if isActiveMember()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'title', 'description', 'src', 'type', 'albumId', 'visibility',
+          'ownerId', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.type in ['image', 'video']
+        && validText(request.resource.data.get('title', ''), 100, true)
+        && validText(request.resource.data.get('description', ''), 500, false)
+        && validText(request.resource.data.get('albumId', ''), 120, false)
+        && request.resource.data.get('visibility', 'public') in ['public', 'private']
+        && validHttpsOrEmpty(request.resource.data.src)
+        && request.resource.data.src != ''
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isActiveMember()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.src == resource.data.src
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'title', 'description', 'albumId', 'visibility', 'updatedAt'
+        ])
+        && validText(request.resource.data.get('title', ''), 100, true)
+        && validText(request.resource.data.get('description', ''), 500, false)
+        && validText(request.resource.data.get('albumId', ''), 120, false)
+        && request.resource.data.get('visibility', 'public') in ['public', 'private']
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isActiveMember() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /mediaAlbums/{albumId} {
+      allow read: if isActiveMember()
+        && (resource.data.get('visibility', 'public') == 'public'
+          || resource.data.ownerId == request.auth.uid);
+      allow create: if isActiveMember()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'ownerId', 'name', 'description', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && validText(request.resource.data.name, 80, true)
+        && validText(request.resource.data.get('description', ''), 300, false)
+        && request.resource.data.get('visibility', 'public') in ['public', 'private']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isActiveMember()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'description', 'visibility', 'updatedAt'
+        ])
+        && validText(request.resource.data.name, 80, true)
+        && validText(request.resource.data.get('description', ''), 300, false)
+        && request.resource.data.get('visibility', 'public') in ['public', 'private']
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isActiveMember() && resource.data.ownerId == request.auth.uid;
+    }

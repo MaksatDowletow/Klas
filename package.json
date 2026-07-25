@@ -7,6 +7,10 @@
     "build:rules": "node scripts/build-firestore-rules.js",
     "test:rules": "npm run build:rules && firebase emulators:exec --only firestore --project demo-klas-auth \"node --test tests/firestore-rules.test.mjs\"",
     "deploy:rules": "npm run build:rules && firebase deploy --only firestore:rules",
+    "install:functions": "npm --prefix functions install",
+    "test:functions": "npm --prefix functions run lint",
+    "deploy:media-function": "firebase deploy --only functions:deleteMediaAsset",
+    "deploy:media-backend": "npm run deploy:rules && npm run deploy:media-function",
     "audit:release": "node scripts/build-pages.js",
     "build:pages": "node scripts/build-pages.js"
   },

@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VERSION = 'klas-shell-v6.5.0';
+const CACHE_VERSION = 'klas-shell-v6.6.0';
 const APP_BASE = new URL('./', self.registration.scope);
 const appUrl = path => new URL(path, APP_BASE).href;
 const APP_SHELL = [
@@ -10,7 +10,7 @@ const APP_SHELL = [
   './klas-v4-1.js','./klas-v4-2.js','./klas-v4-3.js','./klas-v4-4.js','./klas-bridge.js','./klas-pwa.js',
   './klas-backend-bootstrap.js','./klas-backend-core.js','./klas-backend-ui.js','./klas-backend-chat.js','./klas-backend-community.js',
   './klas-backend-notifications.js','./klas-backend-video.js','./klas-backend-realtime.js','./klas-backend-school-relations.js',
-  './klas-school-groups-policy.mjs','./klas-registration-groups-policy.mjs','./klas-registration-groups.js','./klas-group-communication.js',
+  './klas-school-groups-policy.mjs','./klas-registration-groups-policy.mjs','./klas-registration-groups.js','./klas-group-communication.js','./klas-user-media.js',
   './assets/icons/klas-icon.svg','./assets/icons/klas-maskable.svg','./assets/icons/klas-180.png','./assets/icons/klas-192.png','./assets/icons/klas-512.png','./assets/icons/klas-maskable-192.png','./assets/icons/klas-maskable-512.png'
 ].map(appUrl);
 

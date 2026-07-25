@@ -6,6 +6,7 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -16,6 +17,8 @@ import {
 import { db, runtime, bridge, handleError, normalizeHttpUrl } from './klas-backend-core.js';
 
 let stops = [];
+let publicMedia = new Map();
+let ownMedia = new Map();
 
 function requireUser(){
   if (!runtime.user) throw new Error('Ilki Google bilen giriş ediň.');
@@ -32,6 +35,8 @@ function cleanText(value, max, label, required = false){
 function clear(){
   stops.forEach(stop => stop());
   stops = [];
+  publicMedia = new Map();
+  ownMedia = new Map();
   bridge.mergeRemoteGroups([]);
   bridge.mergeRemoteEvents([]);
   bridge.mergeRemoteMedia([]);
@@ -43,6 +48,40 @@ function watch(name, map, method){
     query(collection(db, name), orderBy('createdAt', 'desc'), limit(100)),
     snapshot => bridge[method](snapshot.docs.map(item => map(item.id, item.data()))),
     error => handleError(error, `${name} ýüklenmedi`)
+  ));
+}
+
+function mediaView(id, media){
+  return {
+    id,
+    remote: true,
+    type: media.type === 'video' ? 'video' : 'image',
+    src: media.src || '',
+    title: media.title || 'Media',
+    description: media.description || '',
+    albumId: media.albumId || '',
+    visibility: media.visibility || 'public',
+    ownerId: media.ownerId
+  };
+}
+
+function mergeVisibleMedia(){
+  const merged = new Map(publicMedia);
+  ownMedia.forEach((value, id) => merged.set(id, value));
+  bridge.mergeRemoteMedia([...merged.values()].sort((a, b) => String(b.id).localeCompare(String(a.id))));
+}
+
+function watchMedia(){
+  const uid = runtime.user.uid;
+  stops.push(onSnapshot(
+    query(collection(db, 'media'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'), limit(100)),
+    snapshot => { publicMedia = new Map(snapshot.docs.map(item => [item.id, mediaView(item.id, item.data())])); mergeVisibleMedia(); },
+    error => handleError(error, 'Açyk media ýüklenmedi')
+  ));
+  stops.push(onSnapshot(
+    query(collection(db, 'media'), where('ownerId', '==', uid), orderBy('createdAt', 'desc'), limit(100)),
+    snapshot => { ownMedia = new Map(snapshot.docs.map(item => [item.id, mediaView(item.id, item.data())])); mergeVisibleMedia(); },
+    error => handleError(error, 'Öz mediýaňyz ýüklenmedi')
   ));
 }
 
@@ -71,14 +110,7 @@ function start(){
     attending: (event.attendeeIds || []).includes(runtime.user.uid),
     ownerId: event.ownerId
   }), 'mergeRemoteEvents');
-  watch('media', (id, media) => ({
-    id,
-    remote: true,
-    type: media.type === 'video' ? 'video' : 'image',
-    src: media.src || '',
-    title: media.title || 'Media',
-    ownerId: media.ownerId
-  }), 'mergeRemoteMedia');
+  watchMedia();
   watch('stories', (id, story) => ({
     id,
     remote: true,
@@ -148,10 +180,25 @@ export async function createMedia(data){
   const type = data.type === 'video' ? 'video' : 'image';
   await addDoc(collection(db, 'media'), {
     title: cleanText(data.title || 'Täze media', 100, 'Media ady') || 'Täze media',
+    description: cleanText(data.description, 500, 'Media beýany'),
     src: normalizeHttpUrl(data.src, { allowEmpty: false }),
     type,
+    albumId: cleanText(data.albumId, 120, 'Albom ID-si'),
+    visibility: data.visibility === 'private' ? 'private' : 'public',
     ownerId: user.uid,
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateMedia(id, data){
+  requireUser();
+  await updateDoc(doc(db, 'media', id), {
+    title: cleanText(data.title || 'Media', 100, 'Media ady') || 'Media',
+    description: cleanText(data.description, 500, 'Media beýany'),
+    albumId: cleanText(data.albumId, 120, 'Albom ID-si'),
+    visibility: data.visibility === 'private' ? 'private' : 'public',
+    updatedAt: serverTimestamp()
   });
 }
 
