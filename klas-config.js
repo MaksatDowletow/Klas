@@ -15,7 +15,8 @@ window.KLAS_CONFIG = Object.freeze({
     cloudName: 'fitojlfl',
     uploadPreset: 'klas_unsigned',
     maxImageBytes: 10 * 1024 * 1024,
-    maxVideoBytes: 50 * 1024 * 1024
+    maxVideoBytes: 50 * 1024 * 1024,
+    deleteEndpoint: 'https://us-central1-project-789b5025-7a3c-4b74-88b.cloudfunctions.net/deleteMediaAsset'
   }),
   rtc: Object.freeze({
     iceServers: Object.freeze([
