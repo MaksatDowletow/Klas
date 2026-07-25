@@ -77,6 +77,9 @@ function start(){
     type: media.type === 'video' ? 'video' : 'image',
     src: media.src || '',
     title: media.title || 'Media',
+    description: media.description || '',
+    albumId: media.albumId || '',
+    visibility: media.visibility || 'public',
     ownerId: media.ownerId
   }), 'mergeRemoteMedia');
   watch('stories', (id, story) => ({
@@ -148,10 +151,25 @@ export async function createMedia(data){
   const type = data.type === 'video' ? 'video' : 'image';
   await addDoc(collection(db, 'media'), {
     title: cleanText(data.title || 'Täze media', 100, 'Media ady') || 'Täze media',
+    description: cleanText(data.description, 500, 'Media beýany'),
     src: normalizeHttpUrl(data.src, { allowEmpty: false }),
     type,
+    albumId: cleanText(data.albumId, 120, 'Albom ID-si'),
+    visibility: data.visibility === 'private' ? 'private' : 'public',
     ownerId: user.uid,
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateMedia(id, data){
+  requireUser();
+  await updateDoc(doc(db, 'media', id), {
+    title: cleanText(data.title || 'Media', 100, 'Media ady') || 'Media',
+    description: cleanText(data.description, 500, 'Media beýany'),
+    albumId: cleanText(data.albumId, 120, 'Albom ID-si'),
+    visibility: data.visibility === 'private' ? 'private' : 'public',
+    updatedAt: serverTimestamp()
   });
 }
 
