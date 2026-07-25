@@ -1,5 +1,5 @@
 const statusNode = document.getElementById('backendStatus');
-const release = '20260725-group-communication1';
+const release = '20260725-user-media1';
 const styleHref = `./klas-livechat.css?v=${release}`;
 
 if (![...document.styleSheets].some(sheet => sheet.href?.includes('klas-livechat.css'))) {
@@ -16,7 +16,8 @@ try {
     import(`./klas-backend-realtime.js?v=${release}`),
     import(`./klas-backend-school-relations.js?v=${release}`),
     import(`./klas-registration-groups.js?v=${release}`),
-    import(`./klas-group-communication.js?v=${release}`)
+    import(`./klas-group-communication.js?v=${release}`),
+    import(`./klas-user-media.js?v=${release}`)
   ]);
 } catch (error) {
   console.error('Klas backend başlangyjy başartmady', error);
