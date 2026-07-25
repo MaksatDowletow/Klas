@@ -1,8 +1,7 @@
     match /media/{mediaId} {
-      allow get: if isActiveMember()
+      allow read: if isActiveMember()
         && (resource.data.get('visibility', 'public') == 'public'
           || resource.data.ownerId == request.auth.uid);
-      allow list: if isActiveMember();
       allow create: if isActiveMember()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.keys().hasOnly([
