@@ -70,7 +70,10 @@
           && request.resource.data.from == request.auth.uid
           && request.resource.data.to != request.auth.uid
           && request.resource.data.to in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
-          && request.resource.data.type in ['offer', 'answer', 'candidate'];
+          && request.resource.data.type in ['offer', 'answer', 'candidate']
+          && ((request.resource.data.type == 'offer' && validSessionDescription(request.resource.data.payload, 'offer'))
+            || (request.resource.data.type == 'answer' && validSessionDescription(request.resource.data.payload, 'answer'))
+            || (request.resource.data.type == 'candidate' && validIceCandidate(request.resource.data.payload)));
         allow delete: if isActiveMember()
           && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
       }
