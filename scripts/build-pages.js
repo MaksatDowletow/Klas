@@ -22,6 +22,7 @@ const config = read('klas-config.js');
 const runtime = read('klas-runtime.js');
 const worker = read('service-worker.js');
 const marker = read('DEPLOYMENT_VERSION');
+const unitRunner = read('scripts/test-unit.js');
 
 if (!/^\d+\.\d+\.\d+$/.test(health.version || '')) fail('health.version must be SemVer');
 if (!/^\d+\.\d+\.\d+$/.test(health.cacheVersion || '')) fail('health.cacheVersion must be SemVer');
@@ -38,9 +39,25 @@ for (const file of files) if (!exists(file)) fail(`missing deployment file: ${fi
 const shellPaths = [...worker.matchAll(/'\.\/([^']+)'/g)]
   .map(match => match[1])
   .filter(file => file && file !== '.');
+const shellSet = new Set(shellPaths);
 for (const file of shellPaths) {
   if (!exists(file)) fail(`service worker references missing file: ${file}`);
   if (!files.includes(file)) fail(`service worker asset is absent from deployment-files.json: ${file}`);
+}
+
+const offlineRuntime = files.filter(file => /^klas-.*\.(?:js|mjs)$/.test(file));
+for (const file of offlineRuntime) {
+  if (!shellSet.has(file)) fail(`deployed runtime is absent from offline app shell: ${file}`);
+}
+
+if (pkg.scripts?.test !== 'node scripts/test-unit.js') {
+  fail('npm test must use the portable unit-test discovery runner');
+}
+if (!unitRunner.includes('/\\.test\\.(?:js|mjs)$/') || !unitRunner.includes("firestore-rules.test.mjs")) {
+  fail('unit runner must discover JS/MJS tests and exclude emulator-only Firestore rules tests');
+}
+if (!String(pkg.scripts?.['test:rules'] || '').includes('firebase emulators:exec')) {
+  fail('Firestore rules tests must run through the Firebase emulator');
 }
 
 if (process.exitCode) process.exit(process.exitCode);
