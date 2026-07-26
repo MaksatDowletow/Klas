@@ -10,8 +10,9 @@
     "install:functions": "npm --prefix functions install",
     "test:functions": "npm --prefix functions run lint",
     "deploy:media-function": "firebase deploy --only functions:deleteMediaAsset",
+    "deploy:media-backend": "npm run deploy:rules && npm run deploy:media-function",
     "deploy:ai-function": "firebase deploy --only functions:profileAssistant",
-    "deploy:backend": "npm run deploy:rules && npm run deploy:media-function && npm run deploy:ai-function",
+    "deploy:backend": "npm run deploy:media-backend && npm run deploy:ai-function",
     "audit:release": "node scripts/build-pages.js",
     "build:pages": "node scripts/build-pages.js"
   },
