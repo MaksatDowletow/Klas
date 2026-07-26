@@ -7,7 +7,8 @@ const root = path.resolve(__dirname, '..');
 const basePath = path.join(root, 'firestore.rules');
 const fragmentPaths = [
   path.join(root, 'firestore-group-communication.rules'),
-  path.join(root, 'firestore-user-media.rules')
+  path.join(root, 'firestore-user-media.rules'),
+  path.join(root, 'firestore-personal-room.rules')
 ];
 const outputPath = path.join(root, 'firestore.generated.rules');
 const marker = '    match /{document=**} { allow read, write: if false; }';
@@ -20,7 +21,9 @@ if (!legacyMediaBlock.test(base)) throw new Error('Köne permissive media rules 
 base = base.replace(legacyMediaBlock, '');
 if (!fragments[0].includes('match /groupConversations/{groupId}') || !fragments[0].includes('match /groupCalls/{groupId}')) throw new Error('Topar aragatnaşyk rules fragmenti nädogry.');
 if (!fragments[1].includes('match /media/{mediaId}') || !fragments[1].includes('match /mediaAlbums/{albumId}')) throw new Error('Ulanyjy media rules fragmenti nädogry.');
+if (!fragments[2].includes('match /rooms/{uid}')) throw new Error('Şahsy otag rules fragmenti nädogry.');
 const generated = base.replace(marker, `${fragments.join('\n\n')}\n\n${marker}`);
 if ((generated.match(/match \/media\/\{mediaId\}/g) || []).length !== 1) throw new Error('Generated rules içinde media blogy ýeke-täk bolmaly.');
+if ((generated.match(/match \/rooms\/\{uid\}/g) || []).length !== 1) throw new Error('Generated rules içinde şahsy otag blogy ýeke-täk bolmaly.');
 fs.writeFileSync(outputPath, generated);
 console.log(`Firestore rules generated: ${path.basename(outputPath)} (${fragments.length} fragments)`);
