@@ -1,12 +1,12 @@
 'use strict';
 
-const CACHE_VERSION = 'klas-shell-v6.6.0';
+const CACHE_VERSION = 'klas-shell-v6.6.1';
 const APP_BASE = new URL('./', self.registration.scope);
 const appUrl = path => new URL(path, APP_BASE).href;
 const APP_SHELL = [
   './','./index.html','./offline.html','./privacy.html','./manifest.webmanifest','./health.json',
   './klas-v4.css','./klas-backend.css','./klas-livechat.css','./klas-design-system.css','./klas-media-viewer.css',
-  './klas-config.js','./klas-runtime.js','./klas-auth-policy.js','./klas-presence-policy.js','./klas-media-viewer.js','./klas-contact-sync.js',
+  './klas-config.js','./klas-runtime.js','./klas-cache-recovery.js','./klas-auth-policy.js','./klas-presence-policy.js','./klas-media-viewer.js','./klas-contact-sync.js',
   './klas-v4-1.js','./klas-v4-2.js','./klas-v4-3.js','./klas-v4-4.js','./klas-bridge.js','./klas-pwa.js',
   './klas-backend-bootstrap.js','./klas-backend-core.js','./klas-backend-ui.js','./klas-backend-chat.js','./klas-backend-community.js',
   './klas-backend-notifications.js','./klas-backend-video.js','./klas-backend-realtime.js','./klas-backend-school-relations.js',
@@ -33,6 +33,9 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
 })()));
 self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'CLEAR_APP_CACHES') {
+    event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('klas-shell-')).map(key => caches.delete(key)))));
+  }
   if (event.data?.type === 'GET_VERSION') event.source?.postMessage({ type: 'VERSION', version: CACHE_VERSION });
 });
 async function networkFirst(request, fallbackUrl){

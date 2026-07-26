@@ -10,6 +10,7 @@
     "klas-media-viewer.css",
     "klas-config.js",
     "klas-runtime.js",
+    "klas-cache-recovery.js",
     "klas-auth-policy.js",
     "klas-presence-policy.js",
     "klas-contact-sync.js",

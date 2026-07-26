@@ -1,5 +1,5 @@
 const statusNode = document.getElementById('backendStatus');
-const release = '20260725-user-media1';
+const release = '20260726-cache-recovery1';
 const styleHref = `./klas-livechat.css?v=${release}`;
 
 if (![...document.styleSheets].some(sheet => sheet.href?.includes('klas-livechat.css'))) {
@@ -10,6 +10,7 @@ if (![...document.styleSheets].some(sheet => sheet.href?.includes('klas-livechat
 }
 
 try {
+  await import(`./klas-cache-recovery.js?v=${release}`);
   await Promise.all([
     import(`./klas-backend-ui.js?v=${release}`),
     import(`./klas-backend-video.js?v=${release}`),
