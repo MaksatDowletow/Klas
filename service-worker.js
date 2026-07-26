@@ -1,13 +1,13 @@
 'use strict';
 
-const CACHE_VERSION = 'klas-shell-v6.7.0';
+const CACHE_VERSION = 'klas-shell-v6.8.0';
 const APP_BASE = new URL('./', self.registration.scope);
 const appUrl = path => new URL(path, APP_BASE).href;
 const APP_SHELL = [
   './','./index.html','./offline.html','./privacy.html','./manifest.webmanifest','./health.json',
-  './klas-v4.css','./klas-backend.css','./klas-livechat.css','./klas-design-system.css','./klas-media-viewer.css',
+  './klas-v4.css','./klas-backend.css','./klas-livechat.css','./klas-design-system.css','./klas-media-viewer.css','./klas-personal-room.css',
   './klas-config.js','./klas-runtime.js','./klas-cache-recovery.js','./klas-auth-policy.js','./klas-presence-policy.js','./klas-media-viewer.js','./klas-contact-sync.js',
-  './klas-v4-1.js','./klas-v4-2.js','./klas-v4-3.js','./klas-v4-4.js','./klas-bridge.js','./klas-pwa.js',
+  './klas-v4-1.js','./klas-v4-2.js','./klas-v4-3.js','./klas-v4-4.js','./klas-bridge.js','./klas-pwa.js','./klas-personal-room.js',
   './klas-backend-bootstrap.js','./klas-backend-core.js','./klas-backend-ui.js','./klas-backend-chat.js','./klas-backend-community.js',
   './klas-backend-notifications.js','./klas-backend-video.js','./klas-backend-realtime.js','./klas-backend-school-relations.js',
   './klas-school-groups-policy.mjs','./klas-registration-groups-policy.mjs','./klas-registration-groups.js','./klas-group-communication.js','./klas-user-media.js','./klas-admin-profile-media.js',
