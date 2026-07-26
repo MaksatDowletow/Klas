@@ -34,3 +34,11 @@ test('media controls are rendered at the media location only for its owner', () 
 test('inline media controls stop propagation to viewer button', () => {
   assert.match(runtime,/event\.preventDefault\(\); event\.stopPropagation\(\)/);
 });
+
+test('administrator observer cannot create a whole-document refresh loop', () => {
+  assert.doesNotMatch(runtime,/observe\(document\.body/);
+  assert.match(runtime,/requestAnimationFrame/);
+  assert.match(runtime,/state\.adminSignature === signature/);
+  assert.match(runtime,/observe\(mediaGrid/);
+  assert.match(runtime,/observe\(settingsPage/);
+});
