@@ -1,6 +1,6 @@
 {
   "name": "klas-community",
-  "version": "6.2.0",
+  "version": "6.3.0",
   "private": true,
   "scripts": {
     "test": "node scripts/test-unit.js",
@@ -11,6 +11,8 @@
     "test:functions": "npm --prefix functions run lint",
     "deploy:media-function": "firebase deploy --only functions:deleteMediaAsset",
     "deploy:media-backend": "npm run deploy:rules && npm run deploy:media-function",
+    "deploy:ai-function": "firebase deploy --only functions:profileAssistant",
+    "deploy:backend": "npm run deploy:media-backend && npm run deploy:ai-function",
     "audit:release": "node scripts/build-pages.js",
     "build:pages": "node scripts/build-pages.js"
   },

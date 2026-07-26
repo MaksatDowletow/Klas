@@ -21,11 +21,12 @@
   <link rel="icon" href="./assets/icons/klas-icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./assets/icons/klas-180.png" />
   <title>Klas — Mekdep jemgyýeti</title>
-  <link rel="stylesheet" href="./klas-v4.css?v=20260724-contacts1" />
-  <link rel="stylesheet" href="./klas-backend.css?v=20260724-contacts1" />
-  <link rel="stylesheet" href="./klas-livechat.css?v=20260724-contacts1" />
-  <link rel="stylesheet" href="./klas-design-system.css?v=20260724-contacts1" />
-  <link rel="stylesheet" href="./klas-media-viewer.css?v=20260724-contacts1" />
+  <link rel="stylesheet" href="./klas-v4.css?v=20260726-personal-room1" />
+  <link rel="stylesheet" href="./klas-backend.css?v=20260726-personal-room1" />
+  <link rel="stylesheet" href="./klas-livechat.css?v=20260726-personal-room1" />
+  <link rel="stylesheet" href="./klas-design-system.css?v=20260726-personal-room1" />
+  <link rel="stylesheet" href="./klas-media-viewer.css?v=20260726-personal-room1" />
+  <link rel="stylesheet" href="./klas-personal-room.css?v=20260726-personal-room1" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Esasy mazmuna geç</a>
@@ -48,7 +49,7 @@
         <button type="button" aria-label="Tema" class="icon-btn" id="themeBtn">🌙</button>
         <button type="button" aria-label="Bildirişler" class="icon-btn" data-page="notifications">🔔<span class="badge" id="noticeBadge">3</span></button>
         <button type="button" aria-label="Habarlar" class="icon-btn" data-page="messages">💬<span class="badge secondary-badge hidden" id="messageBadge">0</span></button>
-        <button type="button" class="profile-btn" data-page="settings"><img alt="Profil suraty" class="avatar" id="headerAvatar" src="https://i.pravatar.cc/100?img=12"/><span id="headerName">Maksat</span></button>
+        <button type="button" class="profile-btn" data-page="room"><img alt="Profil suraty" class="avatar" id="headerAvatar" src="https://i.pravatar.cc/100?img=12"/><span id="headerName">Maksat</span></button>
       </div>
     </div>
   </header>
@@ -57,6 +58,7 @@
     <aside class="sidebar" id="sidebar" aria-label="Klas nawigasiýasy">
       <nav class="card nav" aria-label="Esasy bölümler">
         <button type="button" class="active" data-page="feed">🏠 <span>Lenta</span></button>
+        <button type="button" data-page="room">👤 <span>Meniň otagym</span></button>
         <button type="button" data-page="classmates">👥 <span>Synpdaşlar</span><span class="count" id="peopleCount">0</span></button>
         <button type="button" data-page="messages">💬 <span>Habarlaşyk</span><span class="count" id="chatUnreadCount">0</span></button>
         <button type="button" data-page="groups">🏫 <span>Gurnaklar</span></button>
@@ -95,6 +97,10 @@
           </div>
         </div>
         <div class="stack" id="feed"></div>
+      </section>
+
+      <section class="page personal-room-page" id="page-room">
+        <div class="card room-login"><div class="room-login-icon">👤</div><h1>Şahsy otag</h1><p>Maglumatlar taýýarlanýar…</p></div>
       </section>
 
       <section class="page card page-card" id="page-classmates">
@@ -169,18 +175,18 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <input class="hidden" type="file" id="hiddenImageInput" accept="image/*"/>
   <noscript>Bu programma üçin JavaScript işjeň bolmaly.</noscript>
-  <script src="./klas-config.js?v=20260724-contacts1"></script>
-  <script src="./klas-runtime.js?v=20260724-contacts1"></script>
-  <script src="./klas-auth-policy.js?v=20260724-contacts1"></script>
-  <script src="./klas-presence-policy.js?v=20260724-contacts1"></script>
-  <script src="./klas-media-viewer.js?v=20260724-contacts1"></script>
-  <script src="./klas-contact-sync.js?v=20260724-contacts1"></script>
-  <script src="./klas-v4-1.js?v=20260724-contacts1"></script>
-  <script src="./klas-v4-2.js?v=20260724-contacts1"></script>
-  <script src="./klas-v4-3.js?v=20260724-contacts1"></script>
-  <script src="./klas-v4-4.js?v=20260724-contacts1"></script>
-  <script src="./klas-bridge.js?v=20260724-contacts1"></script>
-  <script src="./klas-pwa.js?v=20260724-contacts1"></script>
-  <script type="module" src="./klas-backend-bootstrap.js?v=20260724-contacts1"></script>
+  <script src="./klas-config.js?v=20260726-personal-room1"></script>
+  <script src="./klas-runtime.js?v=20260726-personal-room1"></script>
+  <script src="./klas-auth-policy.js?v=20260726-personal-room1"></script>
+  <script src="./klas-presence-policy.js?v=20260726-personal-room1"></script>
+  <script src="./klas-media-viewer.js?v=20260726-personal-room1"></script>
+  <script src="./klas-contact-sync.js?v=20260726-personal-room1"></script>
+  <script src="./klas-v4-1.js?v=20260726-personal-room1"></script>
+  <script src="./klas-v4-2.js?v=20260726-personal-room1"></script>
+  <script src="./klas-v4-3.js?v=20260726-personal-room1"></script>
+  <script src="./klas-v4-4.js?v=20260726-personal-room1"></script>
+  <script src="./klas-bridge.js?v=20260726-personal-room1"></script>
+  <script src="./klas-pwa.js?v=20260726-personal-room1"></script>
+  <script type="module" src="./klas-backend-bootstrap.js?v=20260726-personal-room1"></script>
 </body>
 </html>

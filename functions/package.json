@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "node --check index.js",
-    "deploy": "firebase deploy --only functions:deleteMediaAsset"
+    "deploy": "firebase deploy --only functions:deleteMediaAsset,functions:profileAssistant"
   },
   "dependencies": {
     "cloudinary": "^2.7.0",

@@ -7,13 +7,14 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, root => {
   'use strict';
 
-  const APP_VERSION = '6.2.0';
+  const APP_VERSION = '6.3.0';
   const SCHEMA_VERSION = 1;
   const STORAGE_KEY = 'klas-v4-state';
   const STORAGE_MARKER = 'klas-store';
   const ERROR_LIMIT = 20;
   const PAGES = Object.freeze([
     'feed',
+    'room',
     'classmates',
     'messages',
     'groups',

@@ -41,6 +41,9 @@ jobs:
             node --check "$file"
           done
 
+      - name: Validate Firebase functions
+        run: npm run test:functions
+
       - name: Run runtime contract tests
         run: npm test
 
