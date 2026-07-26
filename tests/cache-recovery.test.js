@@ -1,12 +1,17 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
+'use strict';
 
-const recovery = fs.readFileSync(new URL('../klas-cache-recovery.js', import.meta.url), 'utf8');
-const bootstrap = fs.readFileSync(new URL('../klas-backend-bootstrap.js', import.meta.url), 'utf8');
-const worker = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
-const deployment = JSON.parse(fs.readFileSync(new URL('../deployment-files.json', import.meta.url), 'utf8'));
-const health = JSON.parse(fs.readFileSync(new URL('../health.json', import.meta.url), 'utf8'));
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const recovery = read('klas-cache-recovery.js');
+const bootstrap = read('klas-backend-bootstrap.js');
+const worker = read('service-worker.js');
+const deployment = JSON.parse(read('deployment-files.json'));
+const health = JSON.parse(read('health.json'));
 
 test('runtime errors trigger guarded cache recovery', () => {
   assert.match(recovery, /addEventListener\('klas:error'/);
@@ -31,7 +36,9 @@ test('recovery runtime is deployed, bootstrapped and cached', () => {
   assert.ok(deployment.files.includes('klas-cache-recovery.js'));
   assert.match(bootstrap, /import\(`\.\/klas-cache-recovery\.js/);
   assert.match(worker, /\.\/klas-cache-recovery\.js/);
-  assert.equal(health.cacheVersion, '6.6.1');
+  const cacheVersion = worker.match(/CACHE_VERSION\s*=\s*'klas-shell-v([^']+)'/)?.[1];
+  assert.ok(cacheVersion, 'Service Worker cache version must be declared');
+  assert.equal(health.cacheVersion, cacheVersion);
   assert.ok(health.features.includes('automatic-cache-recovery'));
   assert.ok(health.features.includes('reload-loop-guard'));
 });
