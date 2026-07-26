@@ -1,5 +1,5 @@
 const statusNode = document.getElementById('backendStatus');
-const release = '20260726-personal-room1';
+const release = '20260726-index-fallback1';
 const styleHref = `./klas-livechat.css?v=${release}`;
 
 if (![...document.styleSheets].some(sheet => sheet.href?.includes('klas-livechat.css'))) {
