@@ -18,13 +18,17 @@ test('personal media manager is deployed and loaded', () => {
   assert.match(worker, /klas-user-media\.js/);
 });
 
-test('manager supports owner query, albums, filters, bulk move and bulk delete', () => {
+test('manager supports owner query, albums, filters, bulk move and secure bulk delete', () => {
   assert.match(runtime, /where\('ownerId','==',uid\)/);
   assert.match(runtime, /mediaAlbums/);
   assert.match(runtime, /mediaManagerAlbumFilter/);
   assert.match(runtime, /moveSelected/);
   assert.match(runtime, /writeBatch/);
-  assert.match(runtime, /batch\.delete/);
+  assert.match(runtime, /async function deleteMediaAsset/);
+  assert.match(runtime, /getIdToken\(\)/);
+  assert.match(runtime, /authorization:`Bearer \$\{token\}`/);
+  assert.match(runtime, /Promise\.allSettled\(unique\.map\(deleteMediaAsset\)\)/);
+  assert.doesNotMatch(runtime, /batch\.delete\(doc\(db,\s*['"]media['"]/);
 });
 
 test('media schema stores editable metadata and visibility', () => {
