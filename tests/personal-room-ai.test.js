@@ -8,6 +8,7 @@ const read = file => fs.readFileSync(file, 'utf8');
 
 const html = read('index.html');
 const runtime = read('klas-runtime.js');
+const bootstrap = read('klas-backend-bootstrap.js');
 const room = read('klas-personal-room.js');
 const worker = read('service-worker.js');
 const rules = read('firestore-personal-room.rules');
@@ -17,8 +18,8 @@ const config = read('klas-config.js');
 test('personal room is routed, rendered and available offline', () => {
   assert.match(html, /data-page="room"/);
   assert.match(html, /id="page-room"/);
-  assert.match(html, /klas-personal-room\.js/);
   assert.match(runtime, /'room'/);
+  assert.match(bootstrap, /import\(`\.\/klas-personal-room\.js\?v=\$\{release\}`\)/);
   assert.match(room, /doc\(db, 'rooms', uid\)/);
   assert.match(worker, /\.\/klas-personal-room\.css/);
   assert.match(worker, /\.\/klas-personal-room\.js/);
