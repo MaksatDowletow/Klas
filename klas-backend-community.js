@@ -32,6 +32,75 @@ function cleanText(value, max, label, required = false){
   return result;
 }
 
+function createdAtMillis(value){
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (Number.isFinite(value?.seconds)) return Number(value.seconds) * 1000;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newestDocs(docs){
+  return [...docs].sort((a, b) => {
+    const difference = createdAtMillis(b.data()?.createdAt) - createdAtMillis(a.data()?.createdAt);
+    return difference || String(b.id).localeCompare(String(a.id));
+  });
+}
+
+function isIndexUnavailable(error){
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code.includes('failed-precondition') && message.includes('index');
+}
+
+function watchWithIndexFallback(primaryQuery, fallbackQuery, onData, label){
+  let primaryStop = null;
+  let fallbackStop = null;
+  let retryTimer = null;
+  let closed = false;
+
+  const stopFallback = () => {
+    fallbackStop?.();
+    fallbackStop = null;
+  };
+
+  const startPrimary = () => {
+    if (closed) return;
+    primaryStop?.();
+    primaryStop = onSnapshot(
+      primaryQuery,
+      snapshot => {
+        stopFallback();
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = null;
+        onData(snapshot, false);
+      },
+      error => {
+        primaryStop = null;
+        if (!isIndexUnavailable(error)) return handleError(error, label);
+        if (!fallbackStop) {
+          console.info(`[Klas] ${label}: Firestore indeksi taýýarlanýar; wagtlaýyn indeks talap etmeýän query ulanylýar.`);
+          fallbackStop = onSnapshot(
+            fallbackQuery,
+            snapshot => onData(snapshot, true),
+            fallbackError => handleError(fallbackError, label)
+          );
+        }
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(startPrimary, 60000);
+      }
+    );
+  };
+
+  startPrimary();
+  return () => {
+    closed = true;
+    primaryStop?.();
+    stopFallback();
+    if (retryTimer) clearTimeout(retryTimer);
+  };
+}
+
 function clear(){
   stops.forEach(stop => stop());
   stops = [];
@@ -61,27 +130,39 @@ function mediaView(id, media){
     description: media.description || '',
     albumId: media.albumId || '',
     visibility: media.visibility || 'public',
-    ownerId: media.ownerId
+    ownerId: media.ownerId,
+    createdAt: media.createdAt || null
   };
 }
 
 function mergeVisibleMedia(){
   const merged = new Map(publicMedia);
   ownMedia.forEach((value, id) => merged.set(id, value));
-  bridge.mergeRemoteMedia([...merged.values()].sort((a, b) => String(b.id).localeCompare(String(a.id))));
+  bridge.mergeRemoteMedia([...merged.values()].sort((a, b) => {
+    const difference = createdAtMillis(b.createdAt) - createdAtMillis(a.createdAt);
+    return difference || String(b.id).localeCompare(String(a.id));
+  }));
 }
 
 function watchMedia(){
   const uid = runtime.user.uid;
-  stops.push(onSnapshot(
+  stops.push(watchWithIndexFallback(
     query(collection(db, 'media'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'), limit(100)),
-    snapshot => { publicMedia = new Map(snapshot.docs.map(item => [item.id, mediaView(item.id, item.data())])); mergeVisibleMedia(); },
-    error => handleError(error, 'Açyk media ýüklenmedi')
+    query(collection(db, 'media'), where('visibility', '==', 'public'), limit(500)),
+    snapshot => {
+      publicMedia = new Map(newestDocs(snapshot.docs).slice(0, 100).map(item => [item.id, mediaView(item.id, item.data())]));
+      mergeVisibleMedia();
+    },
+    'Açyk media ýüklenmedi'
   ));
-  stops.push(onSnapshot(
+  stops.push(watchWithIndexFallback(
     query(collection(db, 'media'), where('ownerId', '==', uid), orderBy('createdAt', 'desc'), limit(100)),
-    snapshot => { ownMedia = new Map(snapshot.docs.map(item => [item.id, mediaView(item.id, item.data())])); mergeVisibleMedia(); },
-    error => handleError(error, 'Öz mediýaňyz ýüklenmedi')
+    query(collection(db, 'media'), where('ownerId', '==', uid), limit(500)),
+    snapshot => {
+      ownMedia = new Map(newestDocs(snapshot.docs).slice(0, 100).map(item => [item.id, mediaView(item.id, item.data())]));
+      mergeVisibleMedia();
+    },
+    'Öz mediýaňyz ýüklenmedi'
   ));
 }
 

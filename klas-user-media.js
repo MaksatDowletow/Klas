@@ -22,6 +22,75 @@ function requireUser(){
   return runtime.user;
 }
 
+function createdAtMillis(value){
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (Number.isFinite(value?.seconds)) return Number(value.seconds) * 1000;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newestDocs(docs){
+  return [...docs].sort((a, b) => {
+    const difference = createdAtMillis(b.data()?.createdAt) - createdAtMillis(a.data()?.createdAt);
+    return difference || String(b.id).localeCompare(String(a.id));
+  });
+}
+
+function isIndexUnavailable(error){
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code.includes('failed-precondition') && message.includes('index');
+}
+
+function watchWithIndexFallback(primaryQuery, fallbackQuery, onData, label){
+  let primaryStop = null;
+  let fallbackStop = null;
+  let retryTimer = null;
+  let closed = false;
+
+  const stopFallback = () => {
+    fallbackStop?.();
+    fallbackStop = null;
+  };
+
+  const startPrimary = () => {
+    if (closed) return;
+    primaryStop?.();
+    primaryStop = onSnapshot(
+      primaryQuery,
+      snapshot => {
+        stopFallback();
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = null;
+        onData(snapshot, false);
+      },
+      error => {
+        primaryStop = null;
+        if (!isIndexUnavailable(error)) return handleError(error, label);
+        if (!fallbackStop) {
+          console.info(`[Klas] ${label}: Firestore indeksi taýýarlanýar; wagtlaýyn indeks talap etmeýän query ulanylýar.`);
+          fallbackStop = onSnapshot(
+            fallbackQuery,
+            snapshot => onData(snapshot, true),
+            fallbackError => handleError(fallbackError, label)
+          );
+        }
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(startPrimary, 60000);
+      }
+    );
+  };
+
+  startPrimary();
+  return () => {
+    closed = true;
+    primaryStop?.();
+    stopFallback();
+    if (retryTimer) clearTimeout(retryTimer);
+  };
+}
+
 function installStyles(){
   if (document.getElementById('userMediaStyles')) return;
   const style = document.createElement('style');
@@ -198,13 +267,24 @@ function start(){
   stop();
   if (!runtime.user) return;
   const uid = runtime.user.uid;
-  state.stopMedia = onSnapshot(query(collection(db,'media'), where('ownerId','==',uid), orderBy('createdAt','desc'), limit(500)), snapshot => {
-    state.items = snapshot.docs.map(item => ({ id:item.id, ...item.data(), visibility:item.data().visibility || 'public', description:item.data().description || '', albumId:item.data().albumId || '' }));
-    render();
-  }, error => handleError(error,'Şahsy media sanawy ýüklenmedi'));
-  state.stopAlbums = onSnapshot(query(collection(db,'mediaAlbums'), where('ownerId','==',uid), orderBy('createdAt','desc'), limit(100)), snapshot => {
-    state.albums = snapshot.docs.map(item => ({ id:item.id, ...item.data() })); refreshAlbumOptions();
-  }, error => handleError(error,'Albomlar ýüklenmedi'));
+  state.stopMedia = watchWithIndexFallback(
+    query(collection(db,'media'), where('ownerId','==',uid), orderBy('createdAt','desc'), limit(500)),
+    query(collection(db,'media'), where('ownerId','==',uid), limit(500)),
+    snapshot => {
+      state.items = newestDocs(snapshot.docs).map(item => ({ id:item.id, ...item.data(), visibility:item.data().visibility || 'public', description:item.data().description || '', albumId:item.data().albumId || '' }));
+      render();
+    },
+    'Şahsy media sanawy ýüklenmedi'
+  );
+  state.stopAlbums = watchWithIndexFallback(
+    query(collection(db,'mediaAlbums'), where('ownerId','==',uid), orderBy('createdAt','desc'), limit(100)),
+    query(collection(db,'mediaAlbums'), where('ownerId','==',uid), limit(250)),
+    snapshot => {
+      state.albums = newestDocs(snapshot.docs).slice(0, 100).map(item => ({ id:item.id, ...item.data() }));
+      refreshAlbumOptions();
+    },
+    'Albomlar ýüklenmedi'
+  );
   installLauncher();
 }
 
