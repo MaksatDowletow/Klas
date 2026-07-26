@@ -1,0 +1,31 @@
+    match /rooms/{uid} {
+      allow read: if isActiveMember() || canReadOwnProfile(uid);
+      allow create: if isProvisionedMember() && isSelf(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'coverURL', 'className', 'interests', 'website',
+          'profileVisibility', 'mediaVisibility', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && validHttpsOrEmpty(request.resource.data.get('coverURL', ''))
+        && validText(request.resource.data.get('className', ''), 20, false)
+        && validText(request.resource.data.get('interests', ''), 300, false)
+        && validHttpsOrEmpty(request.resource.data.get('website', ''))
+        && request.resource.data.get('profileVisibility', 'members') in ['members', 'friends', 'private']
+        && request.resource.data.get('mediaVisibility', 'members') in ['members', 'friends', 'private']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isProvisionedMember() && isSelf(uid)
+        && request.resource.data.uid == request.auth.uid
+        && validHttpsOrEmpty(request.resource.data.get('coverURL', ''))
+        && validText(request.resource.data.get('className', ''), 20, false)
+        && validText(request.resource.data.get('interests', ''), 300, false)
+        && validHttpsOrEmpty(request.resource.data.get('website', ''))
+        && request.resource.data.get('profileVisibility', 'members') in ['members', 'friends', 'private']
+        && request.resource.data.get('mediaVisibility', 'members') in ['members', 'friends', 'private']
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid', 'coverURL', 'className', 'interests', 'website',
+          'profileVisibility', 'mediaVisibility', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
