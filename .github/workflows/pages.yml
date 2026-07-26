@@ -42,7 +42,21 @@ jobs:
           done
 
       - name: Run runtime contract tests
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test > runtime-test.log 2>&1
+          status=$?
+          cat runtime-test.log
+          exit $status
+
+      - name: Upload runtime test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-test-diagnostics
+          path: runtime-test.log
+          retention-days: 1
 
       - name: Audit release and build Pages artifact
         run: npm run build:pages
