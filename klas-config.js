@@ -1,6 +1,6 @@
 /**
  * Klas production configuration.
- * Firebase web config is intentionally public. Never add Cloudinary API Secret here.
+ * Firebase web config is intentionally public. Never add Cloudinary or OpenAI secrets here.
  */
 window.KLAS_CONFIG = Object.freeze({
   firebase: Object.freeze({
@@ -17,6 +17,10 @@ window.KLAS_CONFIG = Object.freeze({
     maxImageBytes: 10 * 1024 * 1024,
     maxVideoBytes: 50 * 1024 * 1024,
     deleteEndpoint: 'https://us-central1-project-789b5025-7a3c-4b74-88b.cloudfunctions.net/deleteMediaAsset'
+  }),
+  ai: Object.freeze({
+    profileAssistantEndpoint: 'https://us-central1-project-789b5025-7a3c-4b74-88b.cloudfunctions.net/profileAssistant',
+    maxPromptChars: 600
   }),
   rtc: Object.freeze({
     iceServers: Object.freeze([
@@ -36,7 +40,7 @@ window.KLAS_CONFIG = Object.freeze({
     maxSessions: 500
   }),
   app: Object.freeze({
-    version: '6.2.0',
+    version: '6.3.0',
     firebaseSdkVersion: '12.16.0',
     allowLocalFallback: true,
     dynamicPages: true,
