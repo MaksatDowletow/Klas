@@ -1,5 +1,6 @@
 'use strict';
 
+const { createHash, randomUUID } = require('node:crypto');
 const { onRequest } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
@@ -13,6 +14,8 @@ const CLOUDINARY_API_KEY = defineSecret('CLOUDINARY_API_KEY');
 const CLOUDINARY_API_SECRET = defineSecret('CLOUDINARY_API_SECRET');
 const CLOUDINARY_CLOUD_NAME = defineSecret('CLOUDINARY_CLOUD_NAME');
 const OPENAI_API_KEY = defineSecret('OPENAI_API_KEY');
+const AI_MINUTE_LIMIT = 5;
+const AI_DAY_LIMIT = 100;
 const ALLOWED_ORIGINS = new Set([
   'https://maksatdowletow.github.io',
   'http://localhost:5173',
@@ -67,6 +70,41 @@ function extractResponseText(payload) {
     }
   }
   return parts.join('\n').trim();
+}
+
+function timestampMillis(value) {
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return Number(value) || 0;
+}
+
+function safetyIdentifier(uid) {
+  return createHash('sha256').update(`klas:${uid}`).digest('hex');
+}
+
+async function enforceAiRateLimit(uid) {
+  const db = getFirestore();
+  const reference = db.collection('aiUsage').doc(uid);
+  const now = Date.now();
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(reference);
+    const data = snapshot.data() || {};
+    const minuteStart = timestampMillis(data.minuteWindowStartedAt);
+    const dayStart = timestampMillis(data.dayWindowStartedAt);
+    const sameMinute = minuteStart > 0 && now - minuteStart < 60_000;
+    const sameDay = dayStart > 0 && now - dayStart < 86_400_000;
+    const minuteCount = sameMinute ? Number(data.minuteCount) || 0 : 0;
+    const dayCount = sameDay ? Number(data.dayCount) || 0 : 0;
+    if (minuteCount >= AI_MINUTE_LIMIT || dayCount >= AI_DAY_LIMIT) throw new Error('AI_RATE_LIMIT');
+    transaction.set(reference, {
+      uid,
+      minuteWindowStartedAt: new Date(sameMinute ? minuteStart : now),
+      minuteCount: minuteCount + 1,
+      dayWindowStartedAt: new Date(sameDay ? dayStart : now),
+      dayCount: dayCount + 1,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+  });
 }
 
 exports.deleteMediaAsset = onRequest({
@@ -153,15 +191,20 @@ exports.profileAssistant = onRequest({
 
     const account = await getFirestore().collection('users').doc(user.uid).get();
     if (!account.exists || account.data()?.status !== 'active') return json(res, 403, { error: 'ACCOUNT_INACTIVE' });
+    await enforceAiRateLimit(user.uid);
 
+    const requestId = randomUUID();
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${OPENAI_API_KEY.value()}`,
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'x-client-request-id': requestId
       },
       body: JSON.stringify({
         model: 'gpt-5-mini',
+        store: false,
+        safety_identifier: safetyIdentifier(user.uid),
         instructions: 'Sen Klas sosial platformasy üçin türkmen dilinde profil bio ýazýan redaktor. Diňe berlen maglumatlara daýan. Saglyk, din, syýasat, etnik gelip çykyş ýa-da başga duýgur häsiýetleri çaklama. Netije 1-3 sözlem, arassa, dostlukly we 500 belgiden gysga bolsun. Diňe taýýar bio tekstini ber.',
         input: JSON.stringify({ goal, profile }),
         max_output_tokens: 220
@@ -169,7 +212,7 @@ exports.profileAssistant = onRequest({
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error('OpenAI profileAssistant error', response.status, payload?.error?.type || payload?.error?.code || 'unknown');
+      console.error('OpenAI profileAssistant error', response.status, payload?.error?.type || payload?.error?.code || 'unknown', requestId);
       const status = response.status === 429 ? 429 : 502;
       return json(res, status, { error: response.status === 429 ? 'AI_LIMIT_REACHED' : 'AI_SERVICE_FAILED' });
     }
@@ -180,7 +223,11 @@ exports.profileAssistant = onRequest({
   } catch (error) {
     console.error('profileAssistant failed', error);
     const code = String(error?.message || 'AI_REQUEST_FAILED');
-    const status = code === 'AUTH_REQUIRED' || code.startsWith('Firebase ID token') ? 401 : 500;
+    const status = code === 'AUTH_REQUIRED' || code.startsWith('Firebase ID token')
+      ? 401
+      : code === 'AI_RATE_LIMIT'
+        ? 429
+        : 500;
     return json(res, status, { error: code });
   }
 });
