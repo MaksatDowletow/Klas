@@ -1,6 +1,6 @@
 import { runtime, bridge, toast, handleError } from './klas-backend-core.js';
 
-const state = { observer:null };
+const state = { observer:null, frame:0, adminSignature:'' };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function currentState(){ return bridge.getState?.() || {}; }
@@ -32,10 +32,16 @@ function renderAdminProfile(){
   const settings = document.getElementById('page-settings');
   if (!settings) return;
   let card = document.getElementById('administratorProfileCard');
-  if (!runtime.user || !isAdmin()) { card?.remove(); return; }
+  if (!runtime.user || !isAdmin()) {
+    state.adminSignature = '';
+    card?.remove();
+    return;
+  }
   const profile = runtime.profile || {};
   const name = profile.fullName || profile.shortName || runtime.user.displayName || 'Administrator';
   const avatar = profile.avatarURL || runtime.user.photoURL || '';
+  const signature = JSON.stringify([runtime.user.uid, role(), name, avatar]);
+  if (card && state.adminSignature === signature) return;
   if (!card) {
     card = document.createElement('section');
     card.id = 'administratorProfileCard';
@@ -44,6 +50,7 @@ function renderAdminProfile(){
     anchor?.insertAdjacentElement('afterend', card);
   }
   card.innerHTML = `<div class="admin-profile-head"><img src="${esc(avatar)}" alt=""><div><span class="admin-role-badge">🛡 Administrator</span><h3>${esc(name)}</h3><small>Ulanyjylar, ulgam ýagdaýy we moderasiýa üçin dolandyryş profili</small></div></div><div class="admin-profile-tools"><button type="button" class="secondary" data-admin-page="notifications">🔔 Moderasiýa bildirişleri</button><button type="button" class="secondary" data-admin-page="groups">🏫 Toparlar</button><button type="button" class="secondary" data-admin-page="settings">⚙ Ulgam ýagdaýy</button></div><small>Media eýeçilik amallary merkezi admin panelinde däl, her mediýanyň duran ýerinde görkezilýär. Administrator diňe aýratyn moderasiýa akymy arkaly başga ulanyjynyň mazmunyna täsir edip biler.</small>`;
+  state.adminSignature = signature;
 }
 
 function decorateMedia(){
@@ -52,7 +59,10 @@ function decorateMedia(){
     const id = button.dataset.media;
     const item = media.find(value => String(value.id) === String(id));
     let shell = button.parentElement?.classList.contains('media-owner-shell') ? button.parentElement : null;
-    if (!owns(item)) { shell?.querySelector('.media-inline-owner-actions')?.remove(); return; }
+    if (!owns(item)) {
+      shell?.querySelector('.media-inline-owner-actions')?.remove();
+      return;
+    }
     if (!shell) {
       shell = document.createElement('div');
       shell.className = 'media-owner-shell';
@@ -68,6 +78,13 @@ function decorateMedia(){
 }
 
 function refresh(){ installStyles(); renderAdminProfile(); decorateMedia(); }
+function scheduleRefresh(){
+  if (state.frame) return;
+  state.frame = requestAnimationFrame(() => {
+    state.frame = 0;
+    refresh();
+  });
+}
 
 document.addEventListener('click', event => {
   const page = event.target.closest('[data-admin-page]');
@@ -84,9 +101,14 @@ document.addEventListener('click', event => {
   }
 });
 
-state.observer = new MutationObserver(() => queueMicrotask(refresh));
-state.observer.observe(document.body,{childList:true,subtree:true});
-window.addEventListener('klas-auth', () => setTimeout(refresh,250));
-window.addEventListener('klas:statechange', () => queueMicrotask(refresh));
-setTimeout(refresh,400);
-window.KlasAdminProfileMedia = Object.freeze({ refresh, isAdmin, owns });
+state.observer = new MutationObserver(records => {
+  if (records.some(record => record.target.closest?.('#mediaGrid, #page-settings'))) scheduleRefresh();
+});
+const mediaGrid = document.getElementById('mediaGrid');
+const settingsPage = document.getElementById('page-settings');
+if (mediaGrid) state.observer.observe(mediaGrid,{childList:true,subtree:true});
+if (settingsPage) state.observer.observe(settingsPage,{childList:true,subtree:true});
+window.addEventListener('klas-auth', () => setTimeout(scheduleRefresh,250));
+window.addEventListener('klas:statechange', scheduleRefresh);
+setTimeout(scheduleRefresh,400);
+window.KlasAdminProfileMedia = Object.freeze({ refresh:scheduleRefresh, isAdmin, owns });
