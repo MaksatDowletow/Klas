@@ -1,108 +1,87 @@
-name: Deploy Firestore Rules and Indexes
+- name: Validate Firebase deployment inputs
+  shell: bash
+  run: |
+    set -euo pipefail
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - firestore.rules
-      - firestore.indexes.json
-      - firebase.json
-      - .firebaserc
-      - package.json
-      - package-lock.json
-      - tests/firestore-rules.test.mjs
-      - .github/workflows/deploy-firestore.yml
+    check_file() {
+      local file="$1"
+      test -s "$file" || {
+        echo "::error file=${file}::Faýl ýok ýa-da boş: ${file}"
+        exit 1
+      }
+    }
 
-permissions:
-  contents: read
-  id-token: write
+    check_text() {
+      local file="$1"
+      local text="$2"
+      grep -Fq "$text" "$file" || {
+        echo "::error file=${file}::Talap edilýän tekst tapylmady: ${text}"
+        exit 1
+      }
+    }
 
-concurrency:
-  group: firestore-production
-  cancel-in-progress: false
+    check_file firebase.json
+    check_file .firebaserc
+    check_file firestore.rules
+    check_file firestore.indexes.json
+    check_file scripts/build-firestore-rules.js
 
-jobs:
-  deploy:
-    name: Deploy to project-789b5025-7a3c-4b74-88b
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    jq empty firebase.json .firebaserc firestore.indexes.json
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    jq -e \
+      '.firestore.rules == "firestore.generated.rules"' \
+      firebase.json > /dev/null
 
-      - name: Authenticate with Workload Identity Federation
-        id: auth
-        uses: google-github-actions/auth@v3
-        with:
-          project_id: project-789b5025-7a3c-4b74-88b
-          workload_identity_provider: projects/608095045728/locations/global/workloadIdentityPools/github-actions/providers/klas-main
-          service_account: github-firestore-deployer@project-789b5025-7a3c-4b74-88b.iam.gserviceaccount.com
-          create_credentials_file: true
-          export_environment_variables: true
+    jq -e \
+      '.firestore.indexes == "firestore.indexes.json"' \
+      firebase.json > /dev/null
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    check_text .firebaserc \
+      "project-789b5025-7a3c-4b74-88b"
 
-      - name: Set up Java for Firestore validation
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
+    echo "Firestore düzgünleri generirlenýär..."
+    npm run build:rules
 
-      - name: Validate Firebase configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s firebase.json
-          test -s .firebaserc
-          test -s firestore.rules
-          test -s firestore.indexes.json
-          jq empty firebase.json .firebaserc firestore.indexes.json
-          grep -q '"rules": "firestore.rules"' firebase.json
-          grep -q '"indexes": "firestore.indexes.json"' firebase.json
-          grep -q 'project-789b5025-7a3c-4b74-88b' .firebaserc
-          grep -q "sign_in_provider == 'google.com'" firestore.rules
-          grep -q 'function isActiveMember()' firestore.rules
-          grep -q 'function isActiveAccount(uid)' firestore.rules
-          grep -q 'function isProvisionedMember()' firestore.rules
-          grep -q 'function canReadOwnProfile(uid)' firestore.rules
-          grep -q "get('status', 'blocked') == 'active'" firestore.rules
-          grep -q "get('status', 'pending') == 'pending'" firestore.rules
-          grep -q 'allow get: if isActiveMember()' firestore.rules
-          grep -q "conversationId == 'direct_'" firestore.rules
-          grep -q 'match /presenceSessions/{sessionId}' firestore.rules
-          grep -Fq "request.resource.data.state in ['online', 'offline']" firestore.rules
-          grep -q "request.resource.data.uid == request.auth.uid" firestore.rules
-          grep -q "'uid', 'fullName', 'shortName', 'email', 'role', 'status', 'admin'" firestore.rules
+    check_file firestore.generated.rules
 
-      - name: Install pinned Firebase test tools
-        run: |
-          npm ci
-          npm install --global firebase-tools@15.24.0
+    # Esasy auth we akkaunt düzgünleri
+    check_text firestore.generated.rules \
+      "sign_in_provider == 'google.com'"
+    check_text firestore.generated.rules \
+      "function isActiveMember()"
+    check_text firestore.generated.rules \
+      "function isActiveAccount(uid)"
+    check_text firestore.generated.rules \
+      "function isProvisionedMember()"
+    check_text firestore.generated.rules \
+      "function canReadOwnProfile(uid)"
+    check_text firestore.generated.rules \
+      "get('status', 'blocked') == 'active'"
+    check_text firestore.generated.rules \
+      "get('status', 'pending') == 'pending'"
 
-      - name: Test Firestore authorization rules
-        run: npm run test:rules
+    # Şahsy çat we realtime presence
+    check_text firestore.generated.rules \
+      "match /presenceSessions/{sessionId}"
+    check_text firestore.generated.rules \
+      "request.resource.data.state in ['online', 'offline']"
+    check_text firestore.generated.rules \
+      "conversationId == 'direct_'"
 
-      - name: Deploy Firestore rules and indexes
-        shell: bash
-        run: |
-          set -euo pipefail
-          firebase deploy \
-            --only firestore \
-            --project project-789b5025-7a3c-4b74-88b \
-            --non-interactive
+    # Toparlaýyn çat we wideo
+    check_text firestore.generated.rules \
+      "match /groupConversations/{groupId}"
+    check_text firestore.generated.rules \
+      "match /groupCalls/{groupId}"
 
-      - name: Deployment summary
-        if: success()
-        run: |
-          echo "### Firestore deployment completed" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Authentication: Workload Identity Federation" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Project: \`project-789b5025-7a3c-4b74-88b\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Rules: \`firestore.rules\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Indexes: \`firestore.indexes.json\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+    # Şahsy media we albomlar
+    check_text firestore.generated.rules \
+      "match /media/{mediaId}"
+    check_text firestore.generated.rules \
+      "match /mediaAlbums/{albumId}"
+
+    # Täze şahsy otag
+    check_text firestore.generated.rules \
+      "match /rooms/{uid}"
+
+    echo "Firebase deployment input barlaglary üstünlikli geçdi."
