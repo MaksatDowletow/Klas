@@ -28,12 +28,16 @@ function json(res, status, body) {
 
 function applyCors(req, res) {
   const origin = req.get('origin') || '';
-  if (ALLOWED_ORIGINS.has(origin)) res.set('access-control-allow-origin', origin);
+  const allowed = !origin || ALLOWED_ORIGINS.has(origin);
+  if (origin && allowed) {
+    res.set('access-control-allow-origin', origin);
+    res.set('access-control-allow-credentials', 'true');
+  }
   res.set('vary', 'Origin');
   res.set('access-control-allow-methods', 'POST, OPTIONS');
   res.set('access-control-allow-headers', 'Authorization, Content-Type');
   res.set('access-control-max-age', '3600');
-  return !origin || ALLOWED_ORIGINS.has(origin);
+  return allowed;
 }
 
 function parseCloudinaryAsset(src, fallbackType = 'image') {
@@ -109,6 +113,7 @@ async function enforceAiRateLimit(uid) {
 
 exports.deleteMediaAsset = onRequest({
   region: 'us-central1',
+  cors: [...ALLOWED_ORIGINS],
   secrets: [CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME],
   timeoutSeconds: 60,
   memory: '256MiB',
@@ -165,6 +170,7 @@ exports.deleteMediaAsset = onRequest({
 
 exports.profileAssistant = onRequest({
   region: 'us-central1',
+  cors: [...ALLOWED_ORIGINS],
   secrets: [OPENAI_API_KEY],
   timeoutSeconds: 60,
   memory: '256MiB',
