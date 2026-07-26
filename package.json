@@ -6,7 +6,7 @@
     "test": "node scripts/test-unit.js",
     "build:rules": "node scripts/build-firestore-rules.js",
     "test:rules": "npm run build:rules && firebase emulators:exec --only firestore --project demo-klas-auth \"node --test tests/firestore-rules.test.mjs\"",
-    "deploy:rules": "npm run build:rules && firebase deploy --only firestore:rules",
+    "deploy:rules": "npm run build:rules && firebase deploy --only firestore:rules,firestore:indexes",
     "install:functions": "npm --prefix functions install",
     "test:functions": "npm --prefix functions run lint",
     "deploy:media-function": "firebase deploy --only functions:deleteMediaAsset",
