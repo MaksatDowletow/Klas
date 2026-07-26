@@ -12,6 +12,7 @@ initializeApp();
 const CLOUDINARY_API_KEY = defineSecret('CLOUDINARY_API_KEY');
 const CLOUDINARY_API_SECRET = defineSecret('CLOUDINARY_API_SECRET');
 const CLOUDINARY_CLOUD_NAME = defineSecret('CLOUDINARY_CLOUD_NAME');
+const OPENAI_API_KEY = defineSecret('OPENAI_API_KEY');
 const ALLOWED_ORIGINS = new Set([
   'https://maksatdowletow.github.io',
   'http://localhost:5173',
@@ -51,6 +52,21 @@ async function verifyUser(req) {
   const match = /^Bearer\s+(.+)$/i.exec(req.get('authorization') || '');
   if (!match) throw new Error('AUTH_REQUIRED');
   return getAuth().verifyIdToken(match[1], true);
+}
+
+function cleanText(value, max) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+}
+
+function extractResponseText(payload) {
+  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text.trim();
+  const parts = [];
+  for (const item of payload?.output || []) {
+    for (const content of item?.content || []) {
+      if (content?.type === 'output_text' && typeof content.text === 'string') parts.push(content.text);
+    }
+  }
+  return parts.join('\n').trim();
 }
 
 exports.deleteMediaAsset = onRequest({
@@ -104,6 +120,66 @@ exports.deleteMediaAsset = onRequest({
   } catch (error) {
     console.error('deleteMediaAsset failed', error);
     const code = String(error?.message || 'DELETE_FAILED');
+    const status = code === 'AUTH_REQUIRED' || code.startsWith('Firebase ID token') ? 401 : 500;
+    return json(res, status, { error: code });
+  }
+});
+
+exports.profileAssistant = onRequest({
+  region: 'us-central1',
+  secrets: [OPENAI_API_KEY],
+  timeoutSeconds: 60,
+  memory: '256MiB',
+  maxInstances: 5
+}, async (req, res) => {
+  if (!applyCors(req, res)) return json(res, 403, { error: 'ORIGIN_FORBIDDEN' });
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return json(res, 405, { error: 'METHOD_NOT_ALLOWED' });
+
+  try {
+    const user = await verifyUser(req);
+    const goal = cleanText(req.body?.goal, 600);
+    const source = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
+    const profile = {
+      fullName: cleanText(source.fullName, 100),
+      city: cleanText(source.city, 80),
+      profession: cleanText(source.profession, 80),
+      school: cleanText(source.school, 120),
+      graduationYear: cleanText(source.graduationYear, 4),
+      className: cleanText(source.className, 20),
+      interests: cleanText(source.interests, 300),
+      currentBio: cleanText(source.currentBio, 500)
+    };
+
+    const account = await getFirestore().collection('users').doc(user.uid).get();
+    if (!account.exists || account.data()?.status !== 'active') return json(res, 403, { error: 'ACCOUNT_INACTIVE' });
+
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${OPENAI_API_KEY.value()}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        instructions: 'Sen Klas sosial platformasy üçin türkmen dilinde profil bio ýazýan redaktor. Diňe berlen maglumatlara daýan. Saglyk, din, syýasat, etnik gelip çykyş ýa-da başga duýgur häsiýetleri çaklama. Netije 1-3 sözlem, arassa, dostlukly we 500 belgiden gysga bolsun. Diňe taýýar bio tekstini ber.',
+        input: JSON.stringify({ goal, profile }),
+        max_output_tokens: 220
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error('OpenAI profileAssistant error', response.status, payload?.error?.type || payload?.error?.code || 'unknown');
+      const status = response.status === 429 ? 429 : 502;
+      return json(res, status, { error: response.status === 429 ? 'AI_LIMIT_REACHED' : 'AI_SERVICE_FAILED' });
+    }
+
+    const bio = cleanText(extractResponseText(payload), 500);
+    if (!bio) return json(res, 502, { error: 'AI_EMPTY_RESPONSE' });
+    return json(res, 200, { ok: true, bio });
+  } catch (error) {
+    console.error('profileAssistant failed', error);
+    const code = String(error?.message || 'AI_REQUEST_FAILED');
     const status = code === 'AUTH_REQUIRED' || code.startsWith('Firebase ID token') ? 401 : 500;
     return json(res, status, { error: code });
   }
